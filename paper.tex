@@ -30,6 +30,8 @@
 \usepackage{url}
 \usepackage{graphicx}
 \usepackage{qtree}
+\usepackage{multicol}
+\usepackage{times}
 
 \begin{document}
 
@@ -176,6 +178,40 @@ expression constraints or/and variable assignments. The head can only contain su
 Variables are limited to the scope of the rule and must be defined in the body facts or through
 the body variable assignments. Variables that only appear on the head are forbidden, since each
 instantiated fact must have only \emph{ground facts} and thus all arguments must be instantiated.
+The abstract syntax for the language is presented in Fig.~\ref{fig:definitions}.
+
+\newcommand{\synlineend}{\\[.5ex]}
+\begin{figure}
+\small
+\begin{tabular}{lrl}
+Structural Facts & $\Gamma ::=$ & $\cdot \| \Gamma,f(\hat t)$  \synlineend
+
+Sensing Facts & $\Theta ::=$ & $\cdot \| \Theta,f(\hat t)$ \synlineend
+
+Accumulated Actions & $\Psi ::=$ & $\cdot \| \Psi,a(\hat t)$  \synlineend
+
+Set of Rules & $\Sigma ::=$ & $\cdot \| \Sigma,R$ \synlineend
+
+Actions & $A ::=$ & $a(\hat x)$ \synlineend
+
+Facts & $F ::=$ & $f(\hat x)$ \synlineend
+
+Constraints & $C ::=$ & $c(\hat x)$ \synlineend
+
+Assignments & $A ::=$ & $e(\hat x)$ \synlineend
+
+External Functions & $X ::=$ & $f(\hat x)$ \synlineend
+
+Expression & $E ::=$ & $E \wedge E \| F \| C \| A \| X$ \synlineend
+
+Rule
+& $R ::=$ & $E \Rightarrow F \| E \Rightarrow A \| agg(F, g, y) \Rightarrow F$ \synlineend
+\end{tabular}
+\vspace*{-1ex}
+\caption{Abstract syntax for Meld programs}
+\vspace*{-2ex}
+\label{fig:definitions}
+\end{figure}
 
 Whenever all body pre-requisites are satisfied, the head subgoals are instantiated as
 facts and then they are added to the program database (except when action facts are derived).
@@ -191,13 +227,6 @@ type or a structured type. Basic types include the integer type, floating point 
 the \emph{node address} (see \ref{sec:localization}).
 A structured type includes lists of basic types. Syntax-wise, lists have a Prolog-like syntax.
 
-\begin{grammar}
-<rule> ::= <ident> ‘=’ <expr>
-\alt ‘for’ <ident> ‘=’ <expr> ‘to’ <expr> ‘do’ <statement>
-\alt ‘{’ <stat-list> ‘}’
-\alt <empty>
-<stat-list> ::= <statement> ‘;’ <stat-list> | <statement>
-\end{grammar}
 
 \subsection{Aggregates}
 
@@ -271,7 +300,7 @@ possible.
 
 \qtreecenterfalse
 \begin{figure}[ht!]
-\scalebox{0.75}{
+\scalebox{0.70}{
 \Tree [.{\bf A} [.{\bf B} [.{\bf C} {\tt fact1(C, C1)} ] {\tt{fact1(B, B1),}\\$\mathtt{B1 > C1}$} ] [.{\bf D} {\tt fact(D, D1)} ] {\tt fact1(A, A1),\\ {\tt A1 $>$ B1}} ]
 }
 \caption{Localization tree}
@@ -390,36 +419,242 @@ node 0 and node 1. However these new paths are not minimal and thus nothing is g
 resulting in a fixpoint in the graph. If, however, a better path was found, the everything
 derived from the old path would have to be deleted and the new path added to the database.
 
+After the fixpoint is reached, a new fact, \texttt{terminated} is generated for each node
+and rule r3 is activated, which forces the writing of the minimum distance and the shortest path
+to the terminal. The \texttt{terminated} fact is called a \emph{sensing fact}, since it is not
+part of the node data structure, but is associated with the state of execution. 
+
 \subsection{Deletion}
 
 Deletion is mechanism that allows Meld to delete all facts derived from invalid facts such
-as aggregates based on partial (and incomplete) information. In the context of modular robotics,
+as aggregates based on partial (and incomplete) information. In modular robotics,
 deletion is used to delete everything derived from old world information and thus keep the database
 of facts consistent to the robot's environment.
 
 Deletion works by considering a deleted fact and matching the rules in exactly the same way as
-derivations are done to determine which facts depend on the deleted one.
+derivations are done to determine which facts depend on the deleted one. Care must be taken when
+deleting facts that were derived by different rules. To accomplish this, we use a reference counting
+scheme similar to garbage collection techniques. We
+keep track of the number of derivations of the fact and, optionally, the
+the depth of derivation of the fact.
 
+The reference count is incremented or decremented whenever the fact is derived or
+deleted, respectively. When the reference count reaches zero, we delete the fact and anything
+derived from it. The derivation depth is used for facts that have cyclic derivations so that
+no infinite cyclic derivations are left with no start.
+This mechanism is throughly explained in~\cite{ashley-rollman-iclp09}.
 
 \subsection{Aggregates and Recursive Rules}
 
-\cite{zaniolo-arni-ong-dood93}
+\subsubsection{XY-Stratification}
 
-\subsection{XY Stratification and Remote Rules}
+\cite{zaniolo-arni-ong-dood93}
 
 \subsubsection{Aggregate modifiers}
 
+Aggregate modifiers 
+
 \section{Parallel Execution}
+
+Distributing the execution of Meld programs is relatively easy since our compiler automatically
+transforms the original program into fully distributed code. Due to the language semantics,
+messaging and placement of data is pre-defined which helps distribute execution.
+
+In our execution model, we have the set of nodes in the graph and a set of \emph{workers}.
+A worker is an independent unit of processing and it is usually either a \emph{thread} or
+a \emph{process}. A worker can process new facts at most from one node at the same time and
+a node can be owned at most by one worker. This restriction simplifies parallelization by not
+allowing several works to manipulate the database of a node at the same time.
+
+The main task of our runtime system is then to balance the load between workers, so that we
+can maximize the speedups. However, we need to make a distinction between \emph{monotonic}
+facts (non-aggregates) and \emph{non-monotonic facts} (aggregates). The former maximizes
+distribution, while the latter requires some form of synchronization in order to
+minimize deletion of facts. Note that doing computation with the wrong fact and the fact
+that workers compute in a non-deterministic manner, it makes the completion process highly
+non-deterministic, since many facts can be wrongly derived and then deleted and recomputed,
+everything depending on how the order of processing of workers.
+
+In order to make evaluation deterministic for any set of workers,
+the distributed evaluation procedure of Meld programs is as follows:
+
+\begin{itemize}
+   \item Workers process all monotonic facts (i.e., non-aggregates) and no aggregates are fired,
+   except if they can be generated \emph{safely};
+   \item When a worker does not have more work, it enters into the \emph{idle state}.
+   \item Once the graph reaches a quiescent state, that is, when all workers are in
+   the idle state, all workers synchronize through a \emph{termination barrier};
+   \item Upon synchronization, aggregates are then generated using the facts of each
+   aggregate collection;
+   \item If any new fact was derived (or a deletion is to be done), they are added to the
+   corresponding queues, and we start a new \emph{computation round};
+   \item If no new facts were derived, the computation is marked as complete and finishes.
+\end{itemize}
+
+Parallelization is maximized when the number of global synchronizations required to compute
+the whole program is minimized. Making the generation of aggregated facts a local decision
+at the node level thus contributes to increased asynchronicity between nodes and increased
+throughput of the whole system.
+
+In the remaining subsections we describe several optimizations and scheduling strategies
+of our runtime system.
 
 \subsection{Topology Ordering}\label{sec:topology}
 
-\subsection{Selective Localization}
+For certain scheduling schemes, in order to distribute computation across workers it is important
+to increase locality of communication, so that a node makes most of its communication to
+neighbor nodes that are being handled by the same worker. This means that the data travels
+in the same worker, which can potentially increase performance. If a worker is a process,
+this means that less inter-process communication or network communication will be done, and,
+in the case of a thread, it may mean more data locality and cache hits.
+
+Our compiler is able to know how many nodes are in the graph and, in most cases, all the
+edges of the graph. This is detected by analyzing the node address constants (that are prepended
+by the symbol @) and the axioms of the program. After parsing and type-checking the program code,
+the compiler then optimizes the topology by building an internal representation of the graph.
+In this phase, each node address $a$ is mapped using a function $M(x)$ to a normalized node
+address $n$. Function $M(x)$ is bijective and the domain is the set of all nodes described in the
+source code. The image of $M$ is $[0, N[$, where $N$ is the number
+of nodes in the graph. The byte-code of a Meld program includes all the pairs $(x, M(x))$ so
+that the runtime system can put this information to use.
+
+We have two methods for defining the function $M(x)$:
+
+\begin{itemize}
+   \item \emph{Randomized}: the mapping is done randomly.
+   \item \emph{Breadth-First}: the mapping is built by picking an arbitrary node, $n_{zero}$
+   and setting $M(n_{zero}) = 0$, then we select all neighbors of $n_{zero}$ and start defining
+   their mappings in increasing order, 1, ..., $N-1$, and adding its neighbors for later processing
+   in a breadth first fashion.
+\end{itemize}
+
+The breadth-first method is used with the intent of clustering closer nodes in an ordered fashion.
+While not optimal, using a breadth-first approach is very efficient and has good results for
+irregular graphs. If we have a static division of work between $N$ workers, where each worker
+is responsible to process a pre-defined set of nodes, we can efficiently slice the domain of function
+$M(x)$ and divide it between the $N$ workers.
+
+For an example, consider the graph in Fig.~\ref{fig:topology1}. The node addresses represented
+are the ones included in the source code. Using a breadth-first method starting by node 1,
+we get the following order: 1, 2, 3, 7, 5, 6 and 4. If we had to do a static division of worker
+for 2 workers, worker 1 would get 1, 2, 3, 7 and worker 2 would get 5, 6 and 4. Note on
+Fig.~\ref{fig:topology1} that only 3 edges exist between the nodes of worker 1 and worker 2.
+This greatly reduces communication between workers and improves parallel efficiency.
+
+\begin{figure}[ht]
+  \centering
+    \includegraphics[width=0.35\textwidth]{figures/topology1.pdf}
+  \caption{Topology using a breadth-first method.}
+  \label{fig:topology1}
+\end{figure}
+
+We intend to explore other methods for defining $M(x)$ in the future, such as the METIS
+partitioning method~\cite{Karypis:1998:FHQ:305219.305248}.
+
+%\subsection{Selective Localization}
 
 \subsection{Scheduling}
 
-\subsubsection{Multithreading}
-\subsubsection{Distributed}
-\subsubsection{Mixed Mode}
+We implemented several \emph{scheduling schemes} to distribute computation across workers.
+Most of these methods are dependent on the nature of the worker in order to maximize efficiency.
+We present results for several programs in Section~\ref{sec:evaluation} using the schedulers
+described here to assess how the scheduling scheme improves or degrades the speedup.
+
+We previously said that each node had a queue of new facts to process. However, this can be relaxed
+in order to account for the existence of workers. We have been experiencing with two main different
+types of queue organizations for parallel and distributed computation:
+
+\subsubsection{Local Queues}
+
+In the local queues organization, each node has a local queue of facts to process and
+there is one or multiple queues of \emph{active nodes} to handle.
+An active node is a node that contains new facts to process and must be handled by some worker.
+
+In Fig.~\ref{fig:localqueues} we present a schematic of local queues. For each local queue
+we have the new facts which are represented the \texttt{predicate}, the \texttt{tuple} and the
+\texttt{count}. The \texttt{count} field is an integer and is used to distinguish between
+derivations and deletions.
+
+\begin{figure}[ht]
+  \centering
+    \includegraphics[width=0.35\textwidth]{figures/localqueues.pdf}
+  \caption{An example of local queues.}
+  \label{fig:localqueues}
+\end{figure}
+
+\subsubsection{Global Queues}
+
+In the global queues organization, there is one or more queues with facts to process
+and the nodes have no queues themselves. Figure~\ref{fig:globalqueue} present a
+global queue with the fields for each element of the queue. Note that now each queue element
+also has a \texttt{node} field, which corresponds to the node the fact is related.
+
+\begin{figure}[ht]
+  \centering
+    \includegraphics[width=0.35\textwidth]{figures/globalqueue.pdf}
+  \caption{An example of a global queue.}
+  \label{fig:globalqueue}
+\end{figure}
+
+\subsection{Multithreaded Scheduling}
+
+Our virtual machine supports multithreaded execution using Pthreads. The workers in all the
+following four scheduling schemes are realized as threads.
+
+\subsubsection{Global Static Division}
+
+The \emph{Global Static Division (GSD)} is a scheduling strategy where each thread
+has a global queue and a pre-defined set of nodes to handle. Every fact that is added
+to the global queue must be from a node the thread actually owns.
+
+How is node ownership defined? Using the topology ordering defined previously, we divide
+statically the $N$ nodes in the graph across $T$ threads. Because execution
+always refers to mapped node addresses, we must know what thread is responsible for a given
+node address. For a node with address $n$, we compute $min(n / (N/T), N-1)$ to know
+the corresponding thread number.
+
+Threads use their global queues to pop a new fact and node and then trigger new derivations.
+A new fact for a node owned by the same thread is simply added to the thread's queue.
+A new fact for a node not owned by the executing thread is, instead of inserted directly
+into the corresponding thread's queue, put into a buffer, so that when this buffer reaches
+a certain size, we can push the whole buffer directly into the other thread's queue.
+This helps improve data locality by making threads not touching other's threads cache lines.
+
+Threads enter into the idle state when their global queues are empty. While idle, threads
+check for new work and for termination.
+
+\subsubsection{Local Static Division}
+\subsubsection{Local Dynamic Division}
+\subsubsection{Local Dynamic Division without Ownership}
+
+\subsection{Distributed Scheduling}
+
+\subsubsection{Global Static Division}
+\subsubsection{Local Static Division}
+
+\subsection{Mixed Mode Scheduling}
+
+\subsubsection{Mixed Global Static Division}
+\subsubsection{Mixed Local Static Division}
+\subsubsection{Mixed Dynamic Division}
+\subsubsection{Mixed Dynamic Division without Ownership}
+
+\section{Virtual Machine Details} 
+
+In this section we present several details about our virtual machine
+that directly deal with parallel and distributed execution.
+
+\subsection{Byte Code}
+
+\subsection{Memory}
+
+\subsection{Queues}
+
+\subsection{Lists}
+
+\subsection{Detecting Parallel Termination}
+
+\subsection{Detecting Distributed Termination}
 
 \section{Evaluation}\label{sec:evaluation}
 
