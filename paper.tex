@@ -57,7 +57,7 @@
 \begin{abstract}
 In the last few years there as been a steady increase of processing power.
 Multicore processors are now increasingly prevalent and networks of commodity computers
-present an opportunity to solve bigger problems. Programming in these kinds of
+present an opportunity to solve more challenging problems. Programming in these kinds of
 systems is not as simple as it should be since optimizing programs to run on
 different types of distributed systems is notoriously hard.
 We propose a logic programming language based on Datalog
@@ -67,9 +67,10 @@ link restricted rules for parallelizing computation
 and \emph{action facts} for doing input/output.
 We developed a compiler and a runtime system with several execution strategies,
 from multithreaded execution to distributed execution using MPI. We also
-developed several techniques based on XY-stratification to reduce memory usage.
-Finally, we present several application cases, from graph problems to machine learning
-algorithms.
+developed several techniques based on XY-stratification to reduce memory usage
+and increase parallelism. We present several application cases, from graph
+problems to machine learning algorithms, that show that our language is
+suitable to take advantage of parallel architectures.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -86,21 +87,21 @@ cores in a single chip.
 For software developers and computer scientists, once focused in developing sequential programs,
 newer hardware usually meant faster programs without any change to the source code. Today,
 the free lunch is over. Multicore processors are now forcing the development of
-new software methodologies that take advantage of increasing processing power.
+new software methodologies that take advantage of increasing processing power through parallelism.
 However, parallel programming is difficult, usually because programs are written
-in imperative stateful programming languages that make use of relatively low level synchronization
+in imperative and stateful programming languages that make use of relatively low level synchronization
 primitives such as locks, mutexes and barriers. This tends to make the task of managing multithreaded
 execution quite intricate and error-prone, resulting in race hazards and deadlocks.
-In the future, \emph{many-core} processors will make this task even more daunting.
+In the future, \emph{many-core} processors will make this task look even more daunting.
 
 On the other hand, advances in network speed and bandwidth are making distributed computing
 more appealing. For instance, \emph{cloud computing} is a new emerging paradigm that wants
-to make every computer connected to the Internet connected to the same pool of computing power,
-where data can be retrieved and computation can be done. For high performance computing, the
-\emph{computer cluster} is a well established paradigm that uses fast local area networks to
-improve performance and solve problems that would take a long time with a single computer.
+to make every computer connected to the Internet as a client of a pool of computing power,
+where data can be retrieved and computation can be done. From the perspective of high performance
+computing, the \emph{computer cluster} is a well established paradigm that uses fast local area
+networks to improve performance and solve problems that would take a long time with a single computer.
 
-Developments in parallel and distributed programming have originated several programming models.
+Developments in parallel and distributed programming have given birth to several programming models.
 At the end of the spectrum are lower-level programming abstractions such as
 \emph{message passing} (e.g., MPI~\cite{gabriel04-open-mpi}) and \emph{shared memory}
 (e.g., Pthreads and OpenMP~\cite{Chapman-2007-UOP-1370966}).
@@ -118,44 +119,48 @@ such as NESL~\cite{Blelloch:1996:PPA:227234.227246} and Id~\cite{Nikhil93anoverv
 Recently, there has been an increasing interest in declarative and data-centric languages.
 MapReduce~\cite{Dean:2008:MSD:1327452.1327492}, for instance, is a popular data-centric programming
 model that is optimized for large clusters. The scheduling and data sharing model is very simple:
-in the \emph{map phase}, data in each node is transformed and in the \emph{reduce phase}, nodes
-communicate to compute the final result.
+in the \emph{map phase}, data is transformed at each node and the result reduced to a final
+result in the \emph{reduce phase}.
 
 A declarative approach that is becoming popular is Datalog~\cite{Ullman:1990:PDK:533142}, a
 bottom-up logic programming language.
 Traditionally used in deductive databases, Datalog is being increasingly used in different fields
-such as: distributed networking~\cite{Loo-condie-garofalakis-p2}, sensor nets~\cite{Chu:2007:DID:1322263.1322281} and cloud computing~\cite{alvaro:boom}.
+such as distributed networking~\cite{Loo-condie-garofalakis-p2}, sensor
+nets~\cite{Chu:2007:DID:1322263.1322281} and cloud computing~\cite{alvaro:boom}.
 
-In the context of the Claytronics project~\cite{goldstein-computer05}, a massive distributed system
+In the context of the Claytronics project~\cite{goldstein-computer05}, a massive distributed system,
 we've been using a Datalog variant called Meld~\cite{ashley-rollman-iclp09, ashley-rollman-derosa-iros07wksp}.
 Meld is specially suited for writing programs for distributed systems where the network
 topology can change dynamically. Such systems are called \emph{ensembles} and they include
 programmable sensor networks and modular robotic systems.
 
-We now have been adapting Meld to implement general parallel algorithms in multicore machines
-and clusters. We extended the language with lists and reduced the need to do deletion.
-We are using the concept of \emph{action facts} to model output.
+Lately, we have been adapting Meld to implement general parallel algorithms in multicore machines
+and clusters. We are using the concept of \emph{action facts} to model output and the language
+has been extended with lists, aggregate modifiers, and new methods for source code analysis to
+reduce deletion and improve throughput.
 
 We have implement a new compiler and a virtual machine that is able to execute on multicore machines
 and distributed networks. For multicore machines we have implemented different scheduling schemes,
 including static division of work and work stealing.
 For distributed networks and clusters we are using MPI with a static division of work.
-Finally, the runtime system is able to take advantage of multicores when doing distributed computation.
+Finally, the runtime system is also able to take advantage of multicores when doing distributed computation,
+thus we can execute programs on multicore clusters, using several threads on the same process to speedup
+computation.
 
 The rest of the paper is organized as follows. In the next section we describe the Meld language
 and the modifications we made to make it more suitable for parallel programming. Next, we present
 how the runtime system distributes the computation across processors and machines and the different
 scheduling schemes. In Section~\ref{sec:evaluation} we evaluate the language modifications with
 several applications from graph theory and machine learning. Finally, we end the paper outlining
-some conclusions and further work.
+some conclusions and future work.
 
 \section{The Meld Language}
 
-Meld is a bottom-up logic programming language based on Datalog. Like Datalog, it
-consists of a database of \emph{facts} and a set of \emph{production rules} for generating new facts.
+Meld is a bottom-up logic programming language based on Datalog. Like Datalog, its
+execution consists in a database of \emph{facts} plus a set of \emph{production rules} for generating new facts.
 Each fact is an association between a \emph{predicate} and a tuple of values. A predicate can be seen
 as a relation or table in which the tuples are its elements. Production rules have the form
-$\mathtt{p :- q_1, q_2, ..., q_n.}$, meaning that "if $\mathtt{q_1}$ and $\mathtt{q_2}$ and ... and
+$\mathtt{p :- q_1, q_2, ..., q_n.}$, logically meaning that "if $\mathtt{q_1}$ and $\mathtt{q_2}$ and ... and
 $\mathtt{q_n}$ are true then $\mathtt{p}$ is true".
 
 \subsection{Evaluation}
@@ -167,7 +172,7 @@ no more facts can be generated. In Meld, we can also have \emph{action facts},
 which are syntactically similar to regular facts but cause some side effect. In the context of
 modular robotics, action facts activate the robot's actuators in order to produce movement
 or control devices. For parallel programming we use the concept of action facts for writing
-results to files. Note that action facts are not added to the database.
+results to files or to the terminal. Note that action facts are not added to the database.
 
 \subsection{Rules}
 
@@ -175,7 +180,7 @@ A Meld program contains a set of rules. A rule has two main components: the \emp
 which indicates the facts to be generated; and the \emph{body}, which contains the pre-requisites
 to generate the head facts. The body may contain the following as pre-requisites: \emph{subgoals},
 expression constraints or/and variable assignments. The head can only contain subgoals.
-Variables are limited to the scope of the rule and must be defined in the body facts or through
+Variables are limited to the scope of the rule and must be defined in the body subgoals or through
 the body variable assignments. Variables that only appear on the head are forbidden, since each
 instantiated fact must have only \emph{ground facts} and thus all arguments must be instantiated.
 The abstract syntax for the language is presented in Fig.~\ref{fig:definitions}.
@@ -217,7 +222,7 @@ Whenever all body pre-requisites are satisfied, the head subgoals are instantiat
 facts and then they are added to the program database (except when action facts are derived).
 To satisfy all pre-requisites, the body
 subgoals must be matched against the program database. Both constraints and subgoals
-match when consistent substitution is found for the body's variables such that one or
+match successfully when a consistent substitution is found for the body's variables such that one or
 more facts in the database are matched. Constraint expressions are boolean expressions that
 use variables from subgoals (and thus database facts) and from variable assignments. Allowed
 expressions in constraints include arithmetic, logical and set-based operations.
@@ -225,8 +230,7 @@ expressions in constraints include arithmetic, logical and set-based operations.
 Each predicate used in the program must be explicitly typed. Each field is either of a basic
 type or a structured type. Basic types include the integer type, floating point numbers and
 the \emph{node address} (see \ref{sec:localization}).
-A structured type includes lists of basic types. Syntax-wise, lists have a Prolog-like syntax.
-
+A structured type includes lists of basic types. Syntax-wise, lists have a syntax similar to Prolog.
 
 \subsection{Aggregates}
 
@@ -252,19 +256,20 @@ fields; and \texttt{first}, to select the first fact field.
 \subsection{Localization}\label{sec:localization}
 
 Another difference between Meld and Datalog, is that in the former, the first field
-of each predicate indicates must have the type node address.
+of each predicate must be typed as a node address.
 In rules, the first argument of each subgoal is called the \emph{home variable} and
-refers to the node where the fact will be stored, so that each node has its own database.
+refers to a place, called the \emph{node}, where facts are stored.
+Therefore, each node has its own database.
 
 This convention originated in the context of declarative networking~\cite{Loo-condie-garofalakis-p2},
-in the P2 system. For modular robotics, this makes it trivial to
+namely, in the P2 system. For modular robotics, this makes it trivial to
 distribute data across the ensemble. In the context of this paper, each fact is a
 \emph{structural fact} and can be seen as part of the data structure representing a node in the graph.
 Moreover, when each fact is associated with a certain node, it helps us distribute
 and parallelize computation and also improve data locality (see~\ref{sec:topology}).
 
 While each fact must be associated with some node, a rule may contain subgoals that refer to
-different nodes. In order to simplify rule activation, the rules are transformed so that
+different nodes. In order to simplify the activation of production rules, each rule is transformed so that
 each subgoal refers to the same node. The process of \emph{localization} is fundamental
 in the distribution of computation.
 
@@ -294,7 +299,7 @@ fact2(A, 2) :-
 To localize this rule, we first build a tree representing the connection paths between nodes by
 picking an arbitrary root node, in this case, the node \texttt{A}, and then by adding
 edges using link facts. The resulting tree is represented in Fig.~\ref{fig:loctree}.
-Note how the constraints were placed in the first node where all the variables used in the constraint
+Note how the constraints were placed in the bottom-most node where all the variables used in the constraint
 were available. This optimization aims to reduce communication by testing constraints as soon as
 possible.
 
@@ -341,8 +346,8 @@ evaluation from P2~\cite{Loo-condie-garofalakis-p2}, which relaxes the semi-naiv
 by making the concept of iteration local to a node.
 
 Whenever a new fact is generated by the node or sent by a neighbor node, the fact is added to local
-queue which contains all new facts. As execution proceeds, a fact pulled out of the queue. Then,
-all rules that use the fact in their body are selected as candidate rules. For each candidate, the
+queue which contains all new facts. As execution proceeds, a fact is pulled out of the queue. Then,
+all rules that use the fact in their body are selected as \emph{candidate rules}. For each candidate, the
 rest of its rule body is matched against the facts in the database. If the rule is proved, the subgoals
 in the head of the rule are instantiated and added to the local queue as new facts.
 
@@ -402,7 +407,7 @@ Using the localization method, we know that node 4 will send a fact representing
 a match of rule r1 to its neighbors, in this case, node 1. Node 1 then instantiates a new
 path fact \texttt{path(@1,~2,~[@1, @4])}. At this moment, node 1 could generate the aggregated
 \texttt{path} fact representing the least path to node 4 or could wait until all the \texttt{path}
-are generated.
+facts are generated.
 
 In a distributed setting, it is difficult to assess if all facts of an
 aggregate collection are already on the database (we present techniques to avoid this in XXX).
@@ -411,12 +416,12 @@ to retract facts derived from invalid facts such as aggregates based on partial 
 or changes in the environment (in the case of modular robotics). Deletion
 is presented in detail in the next section.
 
-In this case of this graph (Fig.~\ref{fig:shortestpathfig}), node 1 can generate the least path
-safely and send it to node 0. Node 0 receives this fact and generates a new aggregate: \texttt{path(@0,3,[@0,@1,@4])}. Node 0 then sends a new fact to node 3, node 3 generates a
-new aggregate and generates a new fact that is sent to node 2. Node 2 then generates its
+In this case of example graph (Fig.~\ref{fig:shortestpathfig}), node 1 can generate the least path
+safely and send it to node 0. Node 0 receives this fact and generates a new aggregate: \texttt{path(@0,3,[@0,@1,@4])}. Node 0 then sends a new fact to node 3. Then, node 3 generates a
+new aggregate and instantiates a new fact that is sent to node 2. Node 2 then generates its
 least path aggregate: \texttt{path(@2,8,[@2,@3,@0,@1,@4])} and fires rule r2 for neighbors
 node 0 and node 1. However these new paths are not minimal and thus nothing is generated,
-resulting in a fixpoint in the graph. If, however, a better path was found, the everything
+resulting in a fixpoint in the graph. If, however, a better path was found, everything
 derived from the old path would have to be deleted and the new path added to the database.
 
 After the fixpoint is reached, a new fact, \texttt{terminated} is generated for each node
@@ -463,10 +468,10 @@ messaging and placement of data is pre-defined which helps distribute execution.
 In our execution model, we have the set of nodes in the graph and a set of \emph{workers}.
 A worker is an independent unit of processing and it is usually either a \emph{thread} or
 a \emph{process}. A worker can process new facts at most from one node at the same time and
-a node can be owned at most by one worker. This restriction simplifies parallelization by not
-allowing several works to manipulate the database of a node at the same time.
+a node can be handled at most by one worker at the same time. This restriction simplifies
+parallelization by not allowing several works to manipulate the database of a node at the same time.
 
-The main task of our runtime system is then to balance the load between workers, so that we
+The main task of our runtime system is thus to balance the load between workers, so that we
 can maximize the speedups. However, we need to make a distinction between \emph{monotonic}
 facts (non-aggregates) and \emph{non-monotonic facts} (aggregates). The former maximizes
 distribution, while the latter requires some form of synchronization in order to
@@ -501,7 +506,8 @@ of our runtime system.
 
 \subsection{Topology Ordering}\label{sec:topology}
 
-For certain scheduling schemes, in order to distribute computation across workers it is important
+For certain scheduling schemes that will be presented shortly,
+to distribute computation across workers it is important
 to increase locality of communication, so that a node makes most of its communication to
 neighbor nodes that are being handled by the same worker. This means that the data travels
 in the same worker, which can potentially increase performance. If a worker is a process,
@@ -514,7 +520,7 @@ by the symbol @) and the axioms of the program. After parsing and type-checking 
 the compiler then optimizes the topology by building an internal representation of the graph.
 In this phase, each node address $a$ is mapped using a function $M(x)$ to a normalized node
 address $n$. Function $M(x)$ is bijective and the domain is the set of all nodes described in the
-source code. The image of $M$ is $[0, N[$, where $N$ is the number
+source code. The codomain of $M$ is the discrete interval $[0, N[$, where $N$ is the number
 of nodes in the graph. The byte-code of a Meld program includes all the pairs $(x, M(x))$ so
 that the runtime system can put this information to use.
 
@@ -530,14 +536,14 @@ We have two methods for defining the function $M(x)$:
 
 The breadth-first method is used with the intent of clustering closer nodes in an ordered fashion.
 While not optimal, using a breadth-first approach is very efficient and has good results for
-irregular graphs. If we have a static division of work between $N$ workers, where each worker
+irregular graphs. If we use a static division of work between $N$ workers, where each worker
 is responsible to process a pre-defined set of nodes, we can efficiently slice the domain of function
 $M(x)$ and divide it between the $N$ workers.
 
 For an example, consider the graph in Fig.~\ref{fig:topology1}. The node addresses represented
 are the ones included in the source code. Using a breadth-first method starting by node 1,
 we get the following order: 1, 2, 3, 7, 5, 6 and 4. If we had to do a static division of worker
-for 2 workers, worker 1 would get 1, 2, 3, 7 and worker 2 would get 5, 6 and 4. Note on
+for 2 workers, worker 1 would get 1, 2, 3, 7 and worker 2 would get 5, 6 and 4. Note from
 Fig.~\ref{fig:topology1} that only 3 edges exist between the nodes of worker 1 and worker 2.
 This greatly reduces communication between workers and improves parallel efficiency.
 
@@ -562,7 +568,7 @@ described here to assess how the scheduling scheme improves or degrades the spee
 
 We previously said that each node had a queue of new facts to process. However, this can be relaxed
 in order to account for the existence of workers. We have been experiencing with two main different
-types of queue organizations for parallel and distributed computation:
+types of queue organizations for parallel and distributed computation: local and global queues.
 
 \subsubsection{Local Queues}
 
@@ -571,7 +577,7 @@ there is one or multiple queues of \emph{active nodes} to handle.
 An active node is a node that contains new facts to process and must be handled by some worker.
 
 In Fig.~\ref{fig:localqueues} we present a schematic of local queues. For each local queue
-we have the new facts which are represented the \texttt{predicate}, the \texttt{tuple} and the
+we have new facts which are represented the \texttt{predicate}, the \texttt{tuple} and the
 \texttt{count}. The \texttt{count} field is an integer and is used to distinguish between
 derivations and deletions.
 
@@ -585,9 +591,9 @@ derivations and deletions.
 \subsubsection{Global Queues}
 
 In the global queues organization, there is one or more queues with facts to process
-and the nodes have no queues themselves. Figure~\ref{fig:globalqueue} present a
+and the nodes have no queues themselves. Figure~\ref{fig:globalqueue} presents a
 global queue with the fields for each element of the queue. Note that now each queue element
-also has a \texttt{node} field, which corresponds to the node the fact is related.
+also has a \texttt{node} field, which corresponds to the node the fact is related to.
 
 \begin{figure}[ht]
   \centering
@@ -596,20 +602,20 @@ also has a \texttt{node} field, which corresponds to the node the fact is relate
   \label{fig:globalqueue}
 \end{figure}
 
-\subsection{Multithreaded Scheduling}
+\subsection{Multithreaded Scheduling}\label{sec:multithreading}
 
 Our virtual machine supports multithreaded execution using Pthreads. The workers in all the
 following four scheduling schemes are realized as threads.
 
-\subsubsection{Global Static Division}
+\subsubsection{Global Static Division (TGSD)}
 
-The \emph{Global Static Division (GSD)} is a scheduling strategy where each thread
-has a global queue and a pre-defined set of nodes to handle. Every fact that is added
+The \emph{Global Static Division (TGSD)} is a scheduling strategy where each thread
+has a global queue and a pre-defined set of nodes $S$ to handle. Every fact that is added
 to the global queue must be from a node the thread actually owns.
 
 How is node ownership defined? Using the topology ordering defined previously, we divide
 statically the $N$ nodes in the graph across $T$ threads. Because execution
-always refers to mapped node addresses, we must know what thread is responsible for a given
+always refers to mapped node addresses, sometimes we must know what thread is responsible for a given
 node address. For a node with address $n$, we compute $min(n / (N/T), N-1)$ to know
 the corresponding thread number.
 
@@ -618,43 +624,255 @@ A new fact for a node owned by the same thread is simply added to the thread's q
 A new fact for a node not owned by the executing thread is, instead of inserted directly
 into the corresponding thread's queue, put into a buffer, so that when this buffer reaches
 a certain size, we can push the whole buffer directly into the other thread's queue.
-This helps improve data locality by making threads not touching other's threads cache lines.
+This helps improve data locality by making threads not touching other's threads cache lines very often.
 
 Threads enter into the idle state when their global queues are empty. While idle, threads
-check for new work and for termination.
+busily check for new work and for round termination. After the end of each round,
+aggregates are generated. Each thread is responsible to generate the aggregates of all
+nodes in $S$.
 
-\subsubsection{Local Static Division}
-\subsubsection{Local Dynamic Division}
-\subsubsection{Local Dynamic Division without Ownership}
+\subsubsection{Local Static Division (TLSD)}
 
-\subsection{Distributed Scheduling}
+In this scheme, a static division of work is made using the topology ordering. However,
+we use local queues instead. Each thread has now a queue of active nodes, where nodes with new
+facts to process are put, so that each node's queue can be processed by the thread.
+Note that node ownership is exactly the same as TGSD.
 
-\subsubsection{Global Static Division}
-\subsubsection{Local Static Division}
+Every node that is in the thread's queue has is state defined as \emph{active}.
+Threads use their queue of nodes to pop a node to handle. During the \emph{handling} phase,
+the thread processes each node's fact until the node's queue is empty, when the node state is then
+set from \emph{active} to \emph{inactive}. When a new fact is generated and pushed into
+the node's queue, the executing thread checks the target node state. If its \emph{inactive},
+it is set as \emph{active} and the node is pushed into the corresponding thread queue in
+order to be handled in the future.
+
+In this scheme, threads also enter into the idle state when their queues are empty. When
+idle, threads busily check for new active nodes and for round termination. Generation of
+aggregates is done in the same way as in TGSD.
+
+\subsubsection{Local Dynamic Division (LDD)}
+
+Local Dynamic Division (LDD) is a scheme where each thread starts with a pre-defined set
+of nodes as in the TLSD scheme but gets more dynamic as time goes by.
+For instance, when a thread $T1$ enters into the idle state, it
+selects a random thread $T2$ to add a \emph{steal request} to the \emph{steal set} of $T2$.
+A steal set is a queue of steal requests. A steal request is just a pointer to a
+\emph{demanding thread}.
+The steal set is processed whenever the thread is going to process more work. First, the thread
+pops a steal request from the steal set and checks if there is some active node in the node queue
+of the thread. If there is, an active node is popped from the queue and changes ownership
+to the demanding thread. In our VM, we can actually change the number of active nodes
+to move, so that more work can be pushed faster to other threads.
+
+We could have used a different scheme for work stealing, namely, to force the demanding thread
+to steal the active nodes directly from the target thread. However, we opted to create the
+steal set, since it will be less accessed than the queue of nodes and therefore will reduce
+cache line invalidation. The queue of nodes
+is accessed much more frequently, to pop nodes or to add new active nodes, respectively.
+The steal set is only modified when a thread enters into the idle state. Furthermore, the design
+of the queue of active nodes can be made more efficient since there are multiple pusher threads
+and only one thread popping nodes and thus no locking is needed while popping nodes. 
+
+Finally, to generate aggregates, each thread maintains a \emph{node set}, a set of nodes owned
+by the thread. For determining the owner of a node during execution of remote rules, each node
+has the field \texttt{owner} which points to the corresponding thread.
+
+\subsubsection{Local Dynamic Division without Ownership (LDDWO)}
+
+While the previous scheduler offers substantial dynamism using work stealing,
+for certain programs, however, this may lead to nodes keep changing from one thread
+to another, hurting performance since the node set needs to be adjusted.
+We have developed the \emph{Local Dynamic Division
+without Ownership (LDDWO)} scheduler that adds more dynamism and eliminates node ownership
+altogether so that any thread can process any node as long as the node is active and is
+not being processed by another thread.
+
+In LDDWO each node has a local queue and there is only one queue $Q$ of active nodes for all threads.
+To get work, a thread pops a node from $Q$ a processes all its facts. When $Q$ is empty,
+threads enter into the idle state.
+During aggregate generation, we use a static division as presented previously, where each node
+processes aggregates for a pre-defined set of nodes.
+
+The advantages of LDDWO is that a thread can pick up a new node immediately after it becomes active,
+improving load balancing and throughput.
+However this mechanism offers much less data locality than before since threads can process any node
+and not a particular set of nodes. Also, contention on the $Q$ may also degrade performance.
+
+\subsection{Distributed Scheduling}\label{sec:distributed}
+
+Our virtual machine supports distributed scheduling using OpenMPI~\cite{gabriel04-open-mpi},
+a low-level message passing library. Contrarily to the previous section, where the worker was
+a thread working in a shared memory environment, the worker is now a process working with
+other processes.
+
+Processes can be executed on the same machine, in a cluster or in a network of machines.
+Because of this, we must take into account for the slower communication time between
+processes. We focused mainly on developing static schedulers
+and we do not consider dynamic approaches in this paper, since they would require
+the movement of nodes between processes, which can be quite expensive since we would
+need to move entire databases of facts over the network.
+
+The marshaling of objects is another important aspect of distributed computation. We marshal both
+the predicate identifier (\texttt{predicate\_id}), the tuple fields and the derivation/deletion
+mark (\texttt{count}). The predicate identifier is an unsigned integer that identifies the predicate
+and is common for all processes executing the same program. Each tuple field is marshaled according
+to its type. Lists are marshaled recursively as pairs. An example of the fact \texttt{path(2, [@3, @4]))} is presented in Fig.~\ref{fig:marshal}.
+
+
+\begin{figure}[ht]
+  \centering
+    \includegraphics[width=0.25\textwidth]{figures/marshal.pdf}
+  \caption{Marshaled representation of the fact \texttt{path(2, [@3, @4])}.}
+  \label{fig:marshal}
+\end{figure}
+
+When a process fires a remote rule and needs to send a fact to a node in another process, the
+fact is added to the corresponding \emph{message set} of the target process. The message set
+is a list of messages (or facts) that are being buffered for later sending. When the marshaled
+message set reaches an arbitrary size (in this case, the OpenMPI message limit), all the facts
+in the message set are sent to the process as a whole to be demarshalled on the other side.
+This buffering mechanism helps us reduce the number of communications between processes.
+
+Buffered messages may also be sent periodically, even if the message size limit was not reached.
+In the idle state, processes immediately send pending messages and then enter into a busy wait
+cycle, where they check for incoming messages or for round termination.
+
+An interesting implementation problem that affects performance is deciding how messages should be sent.
+We send the messages in an asynchronous manner, so that processes can send messages through the
+MPI subsystem and then continue immediately to process more facts, instead of waiting for 
+the completion of the send operation. However, we need to check periodically if the messages
+were received in the other end so we can free the allocated memory used for sending, since we cannot
+free this memory while MPI is using it.
+
+We have a \emph{request handler} for each process that
+maintains a queue of \emph{requests} for each process. A request is a pair containing a memory pointer
+and a MPI request handler. Since the queue of requests is ordered by the send time, with the
+older messages at the beginning and newer messages at the end, we take the first $N$ MPI handlers
+from the first $N$ requests and execute the \texttt{MPI\_Testall} function to test if the
+$N$ requests have all been received by the other process. If they were, we free the first $N$ pointers
+of memory and then we increase $N$ to $N'$ and try to complete the next $N'$ requests, until
+the process fails. We ignore the other requests since if older messages were not received, this
+probably means that newer messages were not received yet. The number of tested requests is adapted
+dynamically, so that more or less requests are tested at the same time.
+
+The process of sending a new fact to a node in the same process is dependent on the scheduling
+scheme used. We may use the \emph{Distributed Global Static Division (DGSD)} scheme,
+where each process uses a global queue or the \emph{Distributed Local Static Division (DLSD)} scheme,
+where local queues are used.
+
+During the termination of each round, all processes generate their node's aggregates and then
+execute a cooperative reduce operation to assess if any of the processes has more work to do,
+i.e., if any aggregate value was generated. The reduced value is used
+to terminate the computation or start another round.
 
 \subsection{Mixed Mode Scheduling}
 
-\subsubsection{Mixed Global Static Division}
-\subsubsection{Mixed Local Static Division}
-\subsubsection{Mixed Dynamic Division}
-\subsubsection{Mixed Dynamic Division without Ownership}
+Our virtual machine can also mix the two previous means of computation, distributed and multithreaded,
+in order to execute several threads in the same MPI process. We still use the static division of
+work between different processes, however, we can use the several ways of distributing computation
+between threads presented in~\ref{sec:multithreading}.
+
+When a thread interacts with a thread in the same process, all the multithreading rules apply,
+however if the other thread resides in a different process, the rules presented 
+in~\ref{sec:distributed} will apply, except for a few cases.
+
+Each thread maintains
+a message set per target process and is able to send messages and check if the messages were received.
+However, only the \emph{leader thread} (an unique thread per process) is able to receive
+messages. The leader thread checks for incoming messages and then adds the facts to the
+corresponding threads in the same process.
+Another role of the leader thread is to work with other threads to detect termination of the
+current round (details in~\ref{sec:distributedtermination}). The leader thread thus represents
+the whole process and tells the other leader threads when the threads in their process have finished.
+However, the leader thread mechanism has a few disadvantages since the time spent receiving messages
+can lead to load imbalances.
+
+In a nutshell, we have the following scheduling schemes:
+
+\begin{itemize}
+   \item \emph{Mixed Global Static Division (MGSD)}: TGSD is used to manage threads.
+   \item \emph{Mixed Local Static Division (MLSD)}: TLSD is used to manage threads.
+   \item \emph{Mixed Dynamic Division (MDD)}: LDD is used to manage threads. Threads can steal work from the threads in the same process.
+   \item \emph{Mixed Dynamic Division without Ownership) (MDDWO)}: LDDWO is used to manage threads. Threads do not have ownership of the process nodes.
+\end{itemize}
 
 \section{Virtual Machine Details} 
 
-In this section we present several details about our virtual machine
-that directly deal with parallel and distributed execution.
+In this section we present several details about our VM,
+from the byte code instructions, memory management, data structures to detection
+of round termination.
 
 \subsection{Byte Code}
 
+The byte code contains the nodes in the graph, the predicate information and the code for
+each predicate that implements pipelined evaluation. Axioms are fired by a special predicate
+that is instantiated for each node at the beginning of execution.
+
+Each thread or process executes an instance of the VM and all instances can access the common
+byte code in memory, however they have their specific data, such as 32 registers, the node they
+are executing on and other information.
+Instructions range from send instructions, to arithmetic instructions, the cons/head/tail triplet,
+conditional instructions and move instructions. A special instruction uses hashing to efficiently
+execute certain blocks of instructions for a particular node (such as instantiating axioms).
+
 \subsection{Memory}
+
+In multithreading applications, the memory allocator used can affect the parallel performance.
+Our allocator uses multiple pools of objects that are particular to each thread. This helps reduce
+contention in memory allocation.
 
 \subsection{Queues}
 
+We employ different queues according to the scheduler used. For the local queues scheme,
+where each thread has a queue of nodes to process, 
+there is only one thread taking things from the queue and multiple threads adding
+things. For this case, the queue used is the \emph{Safe Multiple Pushers Queue (SMPQ)}, which
+is a lock-free data structure implemented using a sentinel node,
+where CAS (compare and set) instructions are only used during the push operation. SMPQ was adapted
+from work done in~\cite{m.michael:simple}.
+
+For queues of facts, namely on nodes or in the global queues scheme, we use a two level data structure.
+On the first level we use a \emph{Binary Tree Bounded Priority Queue
+(BTBPQ)}~\cite{Shavit94diffractingtrees}, where each priority
+level is the stratification level. The BTBPQ is a lock-free binary tree where each leaf is a another
+queue for the second level. The second level uses a SMPQ for the facts of the corresponding
+stratification level.
+
+Finally, we also have a \emph{Safe Multiple Operations Queue (SMOQ)}, where we can have multiple
+threads taking and inserting things in the queue in a thread-safe way using a mutex.
+This queue is used for the LDDWO schedulers.
+
 \subsection{Lists}
+
+Our lists are implemented as typical head/tail pairs. Each pair contains the head, the tail and a reference
+count field for counting the number of data structures pointing to this pair. The reference counter
+is an atomic integer and is incremented when a pair or a field points to it and decremented when
+the parent pair is deleted or a tuple is deleted. When the counter reaches zero, the pair is
+effectively deleted and the memory freed.
+
+Because Meld enables external function calls we need an extra mechanism to handle nested calls
+for functions that return lists, so that intermediate lists are effectively garbage collected.
+For each VM instance, we keep a list of created pairs during the execution of a rule. When the
+execution of a rule completes, we iterate over the list and check if the reference counter is
+still zero. This means that the pair is not being used by any fact, so we delete the pair.
+If the pair is connected to other pairs, they may be also be deleted. 
 
 \subsection{Detecting Parallel Termination}
 
-\subsection{Detecting Distributed Termination}
+When threads exhaust the work they have to do, they enter into the idle state. Here, we must 
+have a way to detect when all the threads have finished, so that we can terminate the current
+round. We adapted the work presented in~\cite{Flood:2001:PGC:1267847.1267868} to implement
+a termination detection barrier. It includes an atomic counter representing the number
+of active threads and a boolean flag for each thread representing the current thread state.
+The termination condition is fired when the counter reaches zero.
+
+\subsection{Detecting Distributed Termination}\label{sec:distributedtermination}
+
+We use the famous Dijkstra-Safras token-ring based algorithm~\cite{safras87} for detecting
+termination. In this algorithm, there is one leader process that starts with a token. This
+token then navigates through all processes until it reaches again the leader process. If
+the final balance of sent and received messages on the token is zero and the token is \emph{clean}
+(i.e., the token did not stop in a process that was still working) then the round terminates.
 
 \section{Evaluation}\label{sec:evaluation}
 
@@ -670,8 +888,6 @@ uses of the language.
 \subsection{Neural Networks}
 
 \section{Conclusions and Further Work}
-
-bla bla linear logic state bla bla splash bp
 
 \acks
 
